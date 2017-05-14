@@ -5,6 +5,7 @@ package io.johnsanchez.sudokusolver.core;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Observable;
@@ -24,25 +25,32 @@ public class SudokuCellGroup implements Observer {
 	private final LineMode mode;
 	private final Integer row;
 	private final Integer col;
-	private final Map<Integer, SudokuCell> locator = new HashMap<Integer, SudokuCell>();
+	private final Map<Integer, SudokuCell> locator = new HashMap<>();
 	private final List<SudokuCell> contents = new ArrayList<SudokuCell>();
 	
-	public SudokuCellGroup(LineMode mode, Integer row, Integer col) {
+	private final SudokuBoard board;
+	private final Set<SudokuCell> unsolved = new HashSet<>();
+	private final Set<Integer> unsolvedValues = new HashSet<>();
+	
+	public SudokuCellGroup(SudokuBoard board, LineMode mode, Integer row, Integer col) {
 		super();
 		this.mode = mode;
 		this.row = row;
 		this.col = col;
+		this.board = board;
+		
+		for (int i = 1; i<=9; i++) {
+			unsolvedValues.add(i);
+		}
 	}
-
-//	public List<SudokuCell> getContents() {
-//		return contents;
-//	}
 	
 	public void addContent(SudokuCell cell) {
 		cell.addObserver(this);
 		contents.add(cell);
 		if (cell.getValue() != null) {
 			locator.put(cell.getValue(), cell);
+		} else {
+			unsolved.add(cell);
 		}
 		if (mode == LineMode.ROW) {
 			cell.setRowGroup(this);
@@ -67,7 +75,16 @@ public class SudokuCellGroup implements Observer {
 	public void update(Observable o, Object arg) {
 		if (o instanceof SudokuCell) {
 			SudokuCell sudokuCell = (SudokuCell) o;
-			locator.put(sudokuCell.getValue(), sudokuCell);
+			if (sudokuCell.getValue() != null) {
+				locator.put(sudokuCell.getValue(), sudokuCell);
+
+				contents.forEach(cell -> {
+					cell.removePossibility(sudokuCell.getValue());
+					cell.removeFlag(sudokuCell.getValue());
+				});
+				unsolvedValues.remove(sudokuCell.getValue());
+				unsolved.remove(sudokuCell);
+			}
 		}
 	}
 	
@@ -76,30 +93,33 @@ public class SudokuCellGroup implements Observer {
 	}
 	
 	public List<SudokuCell> getUnsolved() {
-		List<SudokuCell> unsolved = new ArrayList<>();
-		contents.forEach(cell -> {
-			if (cell.getValue() == null) {
-				unsolved.add(cell);
-			}
-		});
-		return unsolved;
-	}
-	
-	public List<SudokuCell> getUnsolved(Set<Integer> rows, Set<Integer> cols, int value) {
-		List<SudokuCell> unsolved = new ArrayList<>();
-		getUnsolved().forEach(cell -> {
-			if (!rows.contains(cell.getRow()) 
-					&& !cols.contains(cell.getCol())) {
-				if (cell.getPartners().isEmpty() || cell.hasFlag(value)) {
-					unsolved.add(cell);
-				}
-			}
-		});
-		return unsolved;
+		return new ArrayList<>(unsolved);
 	}
 
 	public List<SudokuCell> getContents() {
 		return contents;
+	}
+	
+	public List<SudokuCell> getFlagged(int value) {
+		List<SudokuCell> res = new ArrayList<>();
+		contents.forEach(cell -> {
+			if (cell.hasFlag(value)) {
+				res.add(cell);
+			}
+		});
+		return res;
+	}
+
+	public Set<Integer> getUnsolvedValues() {
+		return new HashSet<>(unsolvedValues);
+	}
+	
+	public SudokuCell locate(int value) {
+		return locator.get(value);
+	}
+
+	public SudokuBoard getBoard() {
+		return board;
 	}
 
 }

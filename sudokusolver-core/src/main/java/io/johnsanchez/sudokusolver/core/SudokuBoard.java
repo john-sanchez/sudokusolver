@@ -20,6 +20,10 @@ public class SudokuBoard implements Observer {
 	 * 
 	 */
 	private final SudokuCell[][] contents = new SudokuCell[9][9];
+	
+	private final Set<SudokuCell> unsolved = new HashSet<>();
+	private final Set<SudokuCell> solved = new HashSet<>();
+	
 	private final Map<Integer, Set<SudokuCell>> locator = new HashMap<Integer, Set<SudokuCell>>();
 	
 	private final SudokuCellGroup[] rows = new SudokuCellGroup[9];
@@ -29,12 +33,12 @@ public class SudokuBoard implements Observer {
 	public SudokuBoard() {
 		
 		for (int i = 0; i < rows.length; i++) {
-			rows[i] = new SudokuCellGroup(LineMode.ROW, i, null);
-			cols[i] = new SudokuCellGroup(LineMode.COLUMN, null, i);
+			rows[i] = new SudokuCellGroup(this, LineMode.ROW, i, null);
+			cols[i] = new SudokuCellGroup(this, LineMode.COLUMN, null, i);
 			
 			int row = i/3;
 			int col = i%3;
-			groups[row][col] = new SudokuCellGroup(LineMode.GROUP, row, col);
+			groups[row][col] = new SudokuCellGroup(this, LineMode.GROUP, row, col);
 		}
 		
 		// init board
@@ -44,6 +48,7 @@ public class SudokuBoard implements Observer {
 				rows[i].addContent(contents[i][j]);
 				cols[j].addContent(contents[i][j]);
 				groups[i/3][j/3].addContent(contents[i][j]);
+				unsolved.add(contents[i][j]);
 				contents[i][j].addObserver(this);
 			}
 		}
@@ -55,6 +60,7 @@ public class SudokuBoard implements Observer {
 	
 	public void setValue(Integer value, int rowIndex, int colIndex) {
 		contents[rowIndex][colIndex].setValue(value);
+		contents[rowIndex][colIndex].setGiven(true);
 	}
 	
 	public void setValues(Integer[][] values) {
@@ -70,7 +76,12 @@ public class SudokuBoard implements Observer {
 	public void update(Observable o, Object arg) {
 		if (o instanceof SudokuCell) {
 			SudokuCell sudokuCell = (SudokuCell) o;
-			locator.get(sudokuCell.getValue()).add(sudokuCell);
+			if (sudokuCell.getValue() != null) {
+				locator.get(sudokuCell.getValue()).add(sudokuCell);
+				
+				unsolved.remove(sudokuCell);
+				solved.add(sudokuCell);
+			}
 		}
 	}
 	
@@ -118,5 +129,46 @@ public class SudokuBoard implements Observer {
 			System.out.println();
 		}
 		System.out.println("------------------------ Rem: " + (81-countSolved()));
+	}
+	
+	public static final String ANSI_RESET = "\u001B[0m";
+	public static final String ANSI_BLACK = "\u001B[30m";
+	public static final String ANSI_RED = "\u001B[31m";
+	public static final String ANSI_GREEN = "\u001B[32m";
+	public static final String ANSI_YELLOW = "\u001B[33m";
+	public static final String ANSI_BLUE = "\u001B[34m";
+	public static final String ANSI_PURPLE = "\u001B[35m";
+	public static final String ANSI_CYAN = "\u001B[36m";
+	public static final String ANSI_WHITE = "\u001B[37m";
+	
+	public void logFlags() {
+		for (int i = 0; i < contents.length; i++) {
+			for (int j = 0; j < contents[i].length; j++) {
+				if (contents[i][j].getValue() == null) {
+					if (contents[i][j].getFlags().size() <= 2 && !contents[i][j].getFlags().isEmpty()) {
+						boolean spaced = false;
+						int k = 0;
+						System.out.print(ANSI_RED + "(");
+						for (int flag : contents[i][j].getFlags()) {
+							System.out.print(flag + (!spaced ? " " : ""));
+							spaced = true;
+							k++;
+						}
+						System.out.print((k < 2 ? " " : "") + ") " + ANSI_RESET);
+					} else {
+						System.out.print(ANSI_RED + "(   ) " + ANSI_RESET);
+					}
+				} else {
+					SudokuCell cell = contents[i][j];
+					System.out.print("  " + (!cell.isGiven() ? ANSI_GREEN : "") +  cell.getValue() + (!cell.isGiven() ? ANSI_RESET : "") + "   ");
+				}
+			}
+			System.out.println();
+		}
+		System.out.println("------------------------ Rem: " + (81-countSolved()));
+	}
+
+	public Set<SudokuCell> getUnsolved() {
+		return new HashSet<>(unsolved);
 	}
 }
